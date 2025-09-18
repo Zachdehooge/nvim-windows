@@ -1,3 +1,13 @@
+-- Suppress "require('lspconfig') is deprecated" warning
+local orig_notify = vim.notify
+vim.notify = function(msg, ...)
+  if type(msg) == "string" and msg:match("require%(\'lspconfig\'%)") then
+    return
+  end
+  orig_notify(msg, ...)
+end
+
+-- Diagnostics
 vim.diagnostic.config({
 	virtual_text = false,
 	virtual_lines = false,
@@ -6,42 +16,34 @@ vim.diagnostic.config({
 	update_in_insert = false,
 })
 
--- load defaults i.e lua_lsp
+-- Load nvchad defaults
 require("nvchad.configs.lspconfig").defaults()
 
-local lspconfig = require("lspconfig")
-
--- EXAMPLE
-local servers = { "html", "cssls" }
+-- LSP setup
 local nvlsp = require("nvchad.configs.lspconfig")
+local lspconfig = require("lspconfig")  -- required for setup()
 local util = require("lspconfig/util")
 
--- vim.diagnostic.config({
--- 	virtual_text = false, -- Disable inline text on the same line
--- 	virtual_lines = false, -- Disable built-in virt_lines (we do it ourselves)
--- 	signs = true, -- Optional: keep signs in gutter
--- 	underline = true, -- Optional: underline problem text
--- 	update_in_insert = false, -- Don't show diagnostics in insert mode
--- })
-
--- lsps with default config
-for _, lsp in ipairs(servers) do
-	lspconfig[lsp].setup({
+-- Servers with default config
+local servers = { "html", "cssls" }
+for _, server_name in ipairs(servers) do
+	lspconfig[server_name].setup({
 		on_attach = nvlsp.on_attach,
 		on_init = nvlsp.on_init,
 		capabilities = nvlsp.capabilities,
 	})
 end
 
+-- Terraform
 local tf_capb = vim.lsp.protocol.make_client_capabilities()
 tf_capb.textDocument.completion.completionItem.snippetSupport = true
-
 lspconfig.terraformls.setup({
 	on_attach = nvlsp.on_attach,
 	flags = { debounce_text_changes = 150 },
 	capabilities = tf_capb,
 })
 
+-- Go
 lspconfig.gopls.setup({
 	on_attach = nvlsp.on_attach,
 	capabilities = nvlsp.capabilities,
@@ -52,18 +54,17 @@ lspconfig.gopls.setup({
 		gopls = {
 			completeUnimported = true,
 			usePlaceholders = true,
-			analyses = {
-				unusedparams = true,
-			},
+			analyses = { unusedparams = true },
 		},
 	},
 })
 
+-- Python
 lspconfig.pyright.setup({
 	settings = {
 		python = {
 			analysis = {
-				typeCheckingMode = "off", -- can be "strict", "basic", or "off"
+				typeCheckingMode = "off",
 				autoSearchPaths = true,
 				useLibraryCodeForTypes = true,
 			},
@@ -71,49 +72,16 @@ lspconfig.pyright.setup({
 	},
 })
 
--- In your lua/configs/lspconfig.lua or similar file
--- local on_attach = function(client, bufnr)
--- Your existing on_attach code...
-
--- Enable inlay hints if supported
--- 	if client.server_capabilities.inlayHintProvider then
--- 		vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
--- 	end
--- end
-
--- Or enable globally for all buffers
--- vim.api.nvim_create_autocmd("LspAttach", {
--- 	callback = function(args)
--- 		local client = vim.lsp.get_client_by_id(args.data.client_id)
--- 		if client and client.server_capabilities.inlayHintProvider then
--- 			vim.lsp.inlay_hint.enable(true, { bufnr = args.buf })
--- 		end
--- 	end,
--- })
-
--- Optional: Add a keybinding to toggle inlay hints
--- vim.keymap.set("n", "<leader>ih", function()
--- 	vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
--- end, { desc = "Toggle inlay hints" })
-
-require("lspconfig").rust_analyzer.setup({
+-- Rust
+lspconfig.rust_analyzer.setup({
 	settings = {
 		["rust-analyzer"] = {
-			inlayHints = {
-				enable = true,
-			},
+			inlayHints = { enable = true },
 		},
 	},
 })
 
--- configuring single server, example: typescript
--- lspconfig.tsserver.setup {
---   on_attach = nvlsp.on_attach,
---   on_init = nvlsp.on_init,
---   capabilities = nvlsp.capabilities,
---
--- FORCE disable virtual_text for all buffers on LSP attach
-
+-- Auto-disable virtual_text and virtual_lines on LspAttach
 vim.api.nvim_create_autocmd("LspAttach", {
 	callback = function()
 		vim.diagnostic.config({
@@ -126,7 +94,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	end,
 })
 
--- Custom diagnostic handler: no virtual_text, only signs/underline
+-- Custom diagnostic handler: disable virtual_text globally
 vim.diagnostic.handlers.virtual_text = {
 	show = function() end,
 	hide = function() end,
