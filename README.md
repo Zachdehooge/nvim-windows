@@ -1,1 +1,1 @@
-##NVIM Windows Config
+## NVIM Windows Config
